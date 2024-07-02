@@ -48,4 +48,3 @@ impl Display for Block {
                self.index, self.timestamp, self.data, self.previous_hash, self.hash, self.nonce)
     }
 }
-

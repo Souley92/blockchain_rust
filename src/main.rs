@@ -16,4 +16,3 @@ fn main() {
 
     println!("Is blockchain valid? {}", blockchain.is_chain_valid());
 }
-

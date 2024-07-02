@@ -51,4 +51,3 @@ impl Blockchain {
         since_the_epoch.as_millis()
     }
 }
-
