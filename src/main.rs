@@ -4,50 +4,106 @@ mod transaction;
 
 use blockchain::Blockchain;
 use transaction::NFTTransaction;
-use std::io;
+use hyper::{Body, Response, Server};
+use hyper::service::{make_service_fn, service_fn};
+use std::sync::{Arc, Mutex};
+use std::net::SocketAddr;
 use text_io::read;
+use std::fs::File;
+use std::path::Path;
+use std::io::{self, Write, Read};
+use reqwest;
 
-fn main() -> io::Result<()> {
-    let mut blockchain = Blockchain::new(4);
+const BLOCKCHAIN_FILE: &str = "blockchain.json";
 
-    // Lire les informations de l'utilisateur
-    println!("Enter first name:");
-    let first_name: String = read!();
-    
-    println!("Enter last name:");
-    let last_name: String = read!();
-    
-    println!("Enter class number:");
-    let class_number: String = read!();
-    
-    println!("Enter the path to your image:");
-    let image_path: String = read!();
+#[tokio::main]
+async fn main() -> io::Result<()> {
+    let blockchain = load_blockchain().unwrap_or_else(|| Blockchain::new(4));
+    let blockchain = Arc::new(Mutex::new(blockchain));
 
-    // Calculer le hachage de l'image
-    let image_hash = hash_image(&image_path)?;
-    
-    // Créer une transaction NFT avec les informations fournies
-    let txn = NFTTransaction::new(
-        first_name,
-        last_name,
-        class_number,
-        image_hash,
-    );
+    let make_svc = make_service_fn(move |_conn| {
+        let blockchain = Arc::clone(&blockchain);
+        async move {
+            Ok::<_, hyper::Error>(service_fn(move |req| {
+                let blockchain = Arc::clone(&blockchain);
+                async move {
+                    match (req.method(), req.uri().path()) {
+                        (&hyper::Method::GET, "/blockchain") => {
+                            let blockchain = blockchain.lock().unwrap();
+                            let body = serde_json::to_string(&*blockchain).unwrap();
+                            Ok::<_, hyper::Error>(Response::new(Body::from(body)))
+                        },
+                        (&hyper::Method::POST, "/transaction") => {
+                            let bytes = hyper::body::to_bytes(req.into_body()).await?;
+                            let txn: NFTTransaction = serde_json::from_slice(&bytes).unwrap();
+                            let mut blockchain = blockchain.lock().unwrap();
+                            blockchain.create_transaction(txn);
+                            blockchain.mine_pending_transactions();
+                            save_blockchain(&blockchain).unwrap();
+                            Ok::<_, hyper::Error>(Response::new(Body::from("Transaction added")))
+                        },
+                        _ => {
+                            Ok::<_, hyper::Error>(Response::new(Body::from("Not found")))
+                        }
+                    }
+                }
+            }))
+        }
+    });
 
-    // Ajouter la transaction à la blockchain
-    blockchain.create_transaction(txn);
-    blockchain.mine_pending_transactions();
+    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    let server = Server::bind(&addr).serve(make_svc);
 
-    // Afficher les blocs de la blockchain
-    for block in &blockchain.chain {
-        println!("{}", block);
-        display_transactions(&block.transactions);
+    println!("Listening on http://{}", addr);
+
+    tokio::spawn(async move {
+        if let Err(e) = server.await {
+            eprintln!("server error: {}", e);
+        }
+    });
+
+    // Client loop to add transactions
+    loop {
+        // Lire les informations de l'utilisateur
+        println!("Enter first name:");
+        let first_name: String = read!();
+        
+        println!("Enter last name:");
+        let last_name: String = read!();
+        
+        println!("Enter class number:");
+        let class_number: String = read!();
+        
+        println!("Enter the path to your image:");
+        let image_path: String = read!();
+
+        // Calculer le hachage de l'image
+        let image_hash = hash_image(&image_path)?;
+        
+        // Créer une transaction NFT avec les informations fournies
+        let txn = NFTTransaction::new(
+            first_name,
+            last_name,
+            class_number,
+            image_hash,
+        );
+
+        // Envoyer la transaction au serveur local
+        match send_transaction(txn).await {
+            Ok(response) => println!("Transaction response: {}", response),
+            Err(e) => eprintln!("Failed to send transaction: {}", e),
+        }
     }
+}
 
-    // Vérifier la validité de la blockchain
-    println!("Is blockchain valid? {}", blockchain.is_chain_valid());
+async fn send_transaction(txn: NFTTransaction) -> Result<String, reqwest::Error> {
+    let client = reqwest::Client::new();
+    let res = client.post("http://127.0.0.1:3000/transaction")
+        .json(&txn)
+        .send()
+        .await?;
 
-    Ok(())
+    res.text().await
 }
 
 fn display_transactions(transactions: &Vec<NFTTransaction>) {
@@ -61,8 +117,6 @@ fn display_transactions(transactions: &Vec<NFTTransaction>) {
 }
 
 use sha2::{Sha256, Digest};
-use std::fs::File;
-use std::io::Read;
 
 fn hash_image(file_path: &str) -> io::Result<String> {
     let mut file = File::open(file_path)?;
@@ -78,4 +132,21 @@ fn hash_image(file_path: &str) -> io::Result<String> {
     }
 
     Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn save_blockchain(blockchain: &Blockchain) -> io::Result<()> {
+    let serialized = serde_json::to_string(blockchain).expect("Failed to serialize blockchain");
+    let mut file = File::create(BLOCKCHAIN_FILE)?;
+    file.write_all(serialized.as_bytes())?;
+    Ok(())
+}
+
+fn load_blockchain() -> Option<Blockchain> {
+    if Path::new(BLOCKCHAIN_FILE).exists() {
+        let file = File::open(BLOCKCHAIN_FILE).ok()?;
+        let blockchain: Blockchain = serde_json::from_reader(file).expect("Failed to deserialize blockchain");
+        Some(blockchain)
+    } else {
+        None
+    }
 }
