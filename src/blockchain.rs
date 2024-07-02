@@ -1,9 +1,11 @@
 use crate::block::Block;
+use crate::transaction::NFTTransaction;
 
 #[derive(Debug)]
 pub struct Blockchain {
     pub chain: Vec<Block>,
     pub difficulty: usize,
+    pub pending_transactions: Vec<NFTTransaction>,
 }
 
 impl Blockchain {
@@ -11,21 +13,27 @@ impl Blockchain {
         let mut blockchain = Blockchain {
             chain: Vec::new(),
             difficulty,
+            pending_transactions: Vec::new(),
         };
-        blockchain.chain.push(Block::new(0, Blockchain::current_time(), String::from("Genesis Block"), String::new()));
+        blockchain.chain.push(Block::new(0, Blockchain::current_time(), Vec::new(), String::new()));
         blockchain
     }
 
-    pub fn add_block(&mut self, data: String) {
+    pub fn create_transaction(&mut self, transaction: NFTTransaction) {
+        self.pending_transactions.push(transaction);
+    }
+
+    pub fn mine_pending_transactions(&mut self) {
         let previous_block = self.chain.last().unwrap();
         let mut new_block = Block::new(
             previous_block.index + 1,
             Blockchain::current_time(),
-            data,
+            self.pending_transactions.clone(),
             previous_block.hash.clone(),
         );
         new_block.mine_block(self.difficulty);
         self.chain.push(new_block);
+        self.pending_transactions.clear();
     }
 
     pub fn is_chain_valid(&self) -> bool {

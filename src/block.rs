@@ -1,23 +1,24 @@
 use sha2::{Sha256, Digest};
 use serde::{Serialize, Deserialize};
 use std::fmt::{self, Formatter, Display};
+use crate::transaction::NFTTransaction;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Block {
     pub index: u64,
     pub timestamp: u128,
-    pub data: String,
+    pub transactions: Vec<NFTTransaction>,
     pub previous_hash: String,
     pub hash: String,
     pub nonce: u64,
 }
 
 impl Block {
-    pub fn new(index: u64, timestamp: u128, data: String, previous_hash: String) -> Self {
+    pub fn new(index: u64, timestamp: u128, transactions: Vec<NFTTransaction>, previous_hash: String) -> Self {
         let mut block = Block {
             index,
             timestamp,
-            data,
+            transactions,
             previous_hash: previous_hash.clone(),
             hash: String::new(),
             nonce: 0,
@@ -27,7 +28,7 @@ impl Block {
     }
 
     pub fn calculate_hash(&self) -> String {
-        let data = format!("{}{}{}{}{}", self.index, self.timestamp, self.data, self.previous_hash, self.nonce);
+        let data = format!("{}{}{:?}{}{}", self.index, self.timestamp, self.transactions, self.previous_hash, self.nonce);
         let mut hasher = Sha256::new();
         hasher.update(data.as_bytes());
         format!("{:x}", hasher.finalize())
@@ -44,7 +45,7 @@ impl Block {
 
 impl Display for Block {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "Block {{ index: {}, timestamp: {}, data: {}, previous_hash: {}, hash: {}, nonce: {} }}", 
-               self.index, self.timestamp, self.data, self.previous_hash, self.hash, self.nonce)
+        write!(f, "Block {{ index: {}, timestamp: {}, transactions: {:?}, previous_hash: {}, hash: {}, nonce: {} }}", 
+               self.index, self.timestamp, self.transactions, self.previous_hash, self.hash, self.nonce)
     }
 }
