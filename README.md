@@ -1,5 +1,5 @@
-Blockchain Rust
-Description
+Documentation Complète du Projet de Blockchain en Rust
+Introduction
 
 Ce projet implémente une blockchain simple en utilisant le langage de programmation Rust. Il permet aux utilisateurs de créer et de gérer des transactions NFT (Non-Fungible Token) qui incluent un prénom, un nom, un numéro de classe et le hachage d'une image. La blockchain est sauvegardée sur disque et peut être partagée entre plusieurs nœuds pour créer une base de données décentralisée.
 Fonctionnalités
@@ -49,6 +49,7 @@ sh
     cargo build
 
 Utilisation
+
 Lancement du serveur
 
 Pour lancer le serveur, exécutez la commande suivante :
@@ -58,6 +59,7 @@ sh
 cargo run
 
 Le serveur écoutera sur http://127.0.0.1:3000.
+
 Ajouter une transaction
 
     Démarrage du client : Lorsque vous exécutez cargo run, le programme démarre et vous demandera d'entrer les informations nécessaires pour créer une transaction NFT :
@@ -102,16 +104,9 @@ json
   "nonce": 65092
 }
 
-Structure du projet
+Structure du Projet
 
     main.rs : Le fichier principal qui contient la logique du serveur HTTP et du client.
     block.rs : Définit la structure et les méthodes pour un bloc de la blockchain.
     blockchain.rs : Définit la structure et les méthodes pour la blockchain.
     transaction.rs : Définit la structure et les méthodes pour une transaction NFT.
-
-Contribution
-
-Les contributions sont les bienvenues. Si vous avez des idées d'améliorations ou des fonctionnalités à ajouter, n'hésitez pas à créer une pull request.
-Licence
-
-Ce projet est sous licence MIT. Voir le fichier LICENSE pour plus de détails.
